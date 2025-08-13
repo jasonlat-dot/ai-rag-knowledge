@@ -133,7 +133,7 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
-                    <mainClass>ai-rag-knowledge.dev.tech.Application</mainClass>
+                    <mainClass>com.jasonlat.AiRagApplication</mainClass>
                     <layout>JAR</layout>
                 </configuration>
             </plugin>

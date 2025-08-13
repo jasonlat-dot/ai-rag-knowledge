@@ -6,10 +6,7 @@ import org.springframework.ai.chat.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.ollama.OllamaChatClient;
 import org.springframework.ai.ollama.api.OllamaOptions;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 
 @RestController
@@ -28,7 +25,7 @@ public class OllamaController implements IAiService {
      * @return ChatResponse 对话响应结果
      */
     @RequestMapping(value = "/generate", method = {RequestMethod.POST, RequestMethod.GET})
-    public ChatResponse generate(String model, String message) {
+    public ChatResponse generate(@RequestParam("model") String model, @RequestParam("message") String message) {
         // call: 非流式
         return ollamaChatClient.call(new Prompt(message, OllamaOptions.create().withModel(model)));
     }
@@ -42,7 +39,7 @@ public class OllamaController implements IAiService {
      * @return ChatResponse 对话响应结果
      */
     @RequestMapping(value = "/generate_stream", method = {RequestMethod.POST, RequestMethod.GET})
-    public Flux<ChatResponse> generateStream(String model, String message) {
+    public Flux<ChatResponse> generateStream(@RequestParam("model")String model, @RequestParam("message") String message) {
         // stream: 流式
         return ollamaChatClient.stream(new Prompt(message, OllamaOptions.create().withModel(model)));
     }
