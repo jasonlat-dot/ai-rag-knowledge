@@ -1,0 +1,9 @@
+#file: noinspection SpringBootApplicationYaml
+
+spring:
+  profiles:
+    active: prod
+  application:
+    name: ai-rag-knowledge
+
+
