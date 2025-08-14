@@ -46,8 +46,9 @@ public class RagController implements IRAGService {
                 List<Document> documents = reader.get();
                 // 拆分-切割
                 List<Document> documentSplitterList = tokenTextSplitter.apply(documents);
-                // 打一个标记
+                // 打一个标记 给原始 documents 也打了标记，可能是为了防止拆分过程中标记丢失（例如某些拆分逻辑可能会复制元数据但存在异常），作为一种冗余保障。
                 documents.forEach(doc -> doc.getMetadata().put("knowledge", ragTag));
+                //  "知识库标签"，通过给文档添加这个标记，能够将上传的文档与特定的知识库关联起来。
                 documentSplitterList.forEach(doc -> doc.getMetadata().put("knowledge", ragTag));
                 // 存储到向量库
                 pgVectorStore.accept(documentSplitterList);
