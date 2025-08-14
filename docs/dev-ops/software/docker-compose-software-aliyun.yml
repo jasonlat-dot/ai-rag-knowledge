@@ -213,9 +213,13 @@ services:
     container_name: pgvector
     restart: always
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+      # 设置数据库超级用户名
+      - POSTGRES_USER=jasonlat
+      # 设置超级用户密码
+      - POSTGRES_PASSWORD=lijiaqiang12@
+      # 指定默认创建的数据库名称
       - POSTGRES_DB=postgres
+      # 设置连接数据库的密码
       - PGPASSWORD=postgres
     volumes:
       - ./pgvector/sql/init.sql:/docker-entrypoint-initdb.d/init.sql
