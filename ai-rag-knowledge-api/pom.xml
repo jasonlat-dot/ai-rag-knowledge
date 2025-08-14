@@ -32,6 +32,11 @@
             <artifactId>spring-ai-core</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>com.jasonlat</groupId>
+            <artifactId>ai-rag-knowledge-type</artifactId>
+        </dependency>
+
     </dependencies>
 
     <build>

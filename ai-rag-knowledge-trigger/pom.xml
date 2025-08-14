@@ -64,6 +64,11 @@
         </dependency>
 
         <dependency>
+            <groupId>com.jasonlat</groupId>
+            <artifactId>ai-rag-knowledge-type</artifactId>
+        </dependency>
+
+        <dependency>
             <groupId>io.gitee.li--jiaqiang</groupId>
             <artifactId>redisson-spring-boot-starter</artifactId>
         </dependency>
