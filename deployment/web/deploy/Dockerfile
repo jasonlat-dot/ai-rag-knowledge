@@ -14,9 +14,9 @@ WORKDIR /usr/share/nginx/html
 RUN rm -rf /usr/share/nginx/html/*
 
 # 复制前端静态文件到nginx默认目录
-COPY index.html /usr/share/nginx/html/
-COPY chat.js /usr/share/nginx/html/
-COPY src/ /usr/share/nginx/html/src/
+COPY ../index.html /usr/share/nginx/html/
+COPY ../chat.js /usr/share/nginx/html/
+COPY ../src /usr/share/nginx/html/src/
 
 # 设置文件权限
 RUN chmod -R 755 /usr/share/nginx/html

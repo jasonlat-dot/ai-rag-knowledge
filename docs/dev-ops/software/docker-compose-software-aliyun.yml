@@ -83,6 +83,7 @@ services:
     command: >
       sh -c "redis-server /usr/local/etc/redis/redis.conf --requirepass $$REDIS_PASSWORD"
     environment:
+      # todo 改为你的密码
       REDIS_PASSWORD: yourpassword
     networks:
       - my-network
@@ -102,7 +103,9 @@ services:
     ports:
       - 8081:8081
     environment:
-      - REDIS_HOSTS=local:redis:6379
+      # todo 改为你的密码
+      - REDIS_HOSTS=local:redis:6379:0:yourpassword
+      # 如果只改上面这行无法连接姐u再该改这一行 改为你的密码
       - REDIS_PASSWORD=yourpassword
       - HTTP_USER=admin
       - HTTP_PASSWORD=admin
