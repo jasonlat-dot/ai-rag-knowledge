@@ -39,6 +39,11 @@ spring:
         # nomic-embed-text 这是 Nomic 公司开发的一款轻量级嵌入模型，适合生成文本的向量表示，常用于检索增强生成（RAG）等场景。
         model: nomic-embed-text
 
+knowledge:
+  store:
+#    path: /data/knowledge
+    path: './git-cloned-repo/knowledge'
+
   # 向量数据库
   datasource:
     driver-class-name: org.postgresql.Driver
