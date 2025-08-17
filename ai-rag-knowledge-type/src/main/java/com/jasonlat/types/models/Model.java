@@ -8,7 +8,10 @@ public enum Model {
     /**
      * DeepSeek R1 模型，参数为 1.5b
      */
-    DEEP_SEEK_R1_1_5B("deepseek-r1:1.5b");
+    DEEP_SEEK_R1_1_5B("deepseek-r1:1.5b"),
+
+    OPENAI_4_O_MINI("openai-4o-mini"),
+    ;
 
     private final String fullModelIdentifier;
 

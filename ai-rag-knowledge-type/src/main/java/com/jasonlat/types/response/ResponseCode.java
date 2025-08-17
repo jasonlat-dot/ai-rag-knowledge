@@ -9,6 +9,8 @@ import lombok.NoArgsConstructor;
 @Getter
 public enum ResponseCode {
 
+    MODEL_NOT_SUPPORT("ERROR_0000", "模型不支持"),
+
     SUCCESS("SUCCESS_0000", "成功"),
     UN_ERROR("ERROR_0001", "未知失败"),
     ILLEGAL_PARAMETER("ERROR_0002", "非法参数"),

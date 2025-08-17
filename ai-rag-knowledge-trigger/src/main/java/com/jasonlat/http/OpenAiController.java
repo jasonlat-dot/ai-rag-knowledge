@@ -11,10 +11,11 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.prompt.SystemPromptTemplate;
 import org.springframework.ai.document.Document;
-import org.springframework.ai.ollama.OllamaChatClient;
-import org.springframework.ai.ollama.api.OllamaOptions;
+import org.springframework.ai.openai.OpenAiChatClient;
+import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.vectorstore.PgVectorStore;
 import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
@@ -24,51 +25,53 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import static com.jasonlat.types.models.Model.DEEP_SEEK_R1_1_5B;
+import static com.jasonlat.types.models.Model.OPENAI_4_O_MINI;
+
 
 @Slf4j
 @RestController
-@RequestMapping("/ollama")
+@RequestMapping("/openai")
 @RequiredArgsConstructor
 @CrossOrigin("${app.config.cross-origin}")
-public class OllamaController implements IAiService {
+public class OpenAiController implements IAiService {
 
-    private final OllamaChatClient ollamaChatClient;
+    private final OpenAiChatClient chatClient;
     private final PgVectorStore pgVectorStore;
 
-    /**
-     * 非流式生成对话
-     * <a href="http://localhost:8087/api/v1/ollama/generate?model=deepseek-r1:1.5b&message=hi">...</a>
-     * @param model 模型
-     * @param message 消息
-     * @return ChatResponse 对话响应结果
-     */
+    @Value("${spring.ai.openai.enabled}")
+    private boolean enabled;
+
+    @Override
     @RequestMapping(value = "/generate", method = {RequestMethod.POST, RequestMethod.GET})
-    public ChatResponse generate(@RequestParam("model") String model, @RequestParam("message") String message) {
-        // call: 非流式
+    public ChatResponse generate(@RequestParam String model, @RequestParam String message) {
         try {
-            return ollamaChatClient.call(new Prompt(message, OllamaOptions.create().withModel(model)));
+            if (!enabled) {
+                return Response.errorCall(ResponseCode.MODEL_NOT_SUPPORT);
+            }
+            return chatClient.call(new Prompt(
+                    message,
+                    OpenAiChatOptions.builder()
+                            .withModel(model)
+                            .build()
+            ));
         } catch (Exception e) {
             log.error("服务器异常: {} ->", e.getMessage(), e);
             return Response.errorCall(ResponseCode.SYSTEM_B0001);
         }
     }
 
-
     /**
-     * 流式生成对话
-     * <a href="http://localhost:8087/api/v1/ollama/generate_stream?model=deepseek-r1:1.5b&message=hi">...</a>
-     * @param model 模型
-     * @param message 消息
-     * @return ChatResponse 对话响应结果
+     * curl <a href="http://localhost:8087/api/v1/openai/generate_stream?model=gpt-4o&message=1+1">...</a>
      */
+    @Override
     @RequestMapping(value = "/generate_stream", method = {RequestMethod.POST, RequestMethod.GET})
-    public Flux<ChatResponse> generateStream(@RequestParam("model")String model, @RequestParam("message") String message) {
-        // stream: 流式
+    public Flux<ChatResponse> generateStream(@RequestParam String model, @RequestParam String message) {
         try {
-            log.info("模型: {} ->", model);
-            // 对返回的 Flux 增加异常处理操作符
-            return ollamaChatClient.stream(new Prompt(message, OllamaOptions.create().withModel(model)))
+            if (!enabled) {
+                return Response.errorFlux(ResponseCode.MODEL_NOT_SUPPORT);
+            }
+            return chatClient.stream(new Prompt(
+                    message, OpenAiChatOptions.builder().withModel(model).build()))
                     .onErrorResume(e -> {  // 处理流中发生的异常
                         log.error("流式处理异常: {}", e.getMessage(), e);
                         return Response.errorFlux(ResponseCode.SYSTEM_B0001);
@@ -83,18 +86,8 @@ public class OllamaController implements IAiService {
     @RequestMapping(value = "/generate_stream_rag", method = {RequestMethod.POST, RequestMethod.GET})
     public Flux<ChatResponse> generateStreamRag(@RequestParam("model")String model, @RequestParam("ragTag") String ragTag,@RequestParam("message") String message) {
         try {
-            log.info("generate_stream_rag 模型: {} ->", model);
             // 模型
-            if (!StringUtils.hasLength(model)) model = DEEP_SEEK_R1_1_5B.getFullModelIdentifier().trim();
-
-            // 系统提示词
-            String SYSTEM_PROMPT = """
-                    Use the information from the DOCUMENTS section to provide accurate answers but act as if you knew this information innately.
-                    If unsure, simply state that you don't know.
-                    Another thing you need to note is that your reply must be in Chinese!
-                    DOCUMENTS:
-                        {documents}
-                    """;
+            if (!StringUtils.hasLength(model)) model = OPENAI_4_O_MINI.getFullModelIdentifier().trim();
 
             // 检索知识库                                                                                               # 注意是： knowledge == '{ragTag}'
             SearchRequest searchRequest = SearchRequest.query(message).withTopK(5).withFilterExpression("knowledge == '" + ragTag + "'");
@@ -103,13 +96,21 @@ public class OllamaController implements IAiService {
             // 解析文档，获取信息
             String documentsText = documents.stream().map(Document::getContent).collect(Collectors.joining());
             // 构建系统提示
+            String SYSTEM_PROMPT = """
+                    Use the information from the DOCUMENTS section to provide accurate answers but act as if you knew this information innately.
+                    If unsure, simply state that you don't know.
+                    Another thing you need to note is that your reply must be in Chinese!
+                    DOCUMENTS:
+                        {documents}
+                    """;
+
             Message ragMessage = new SystemPromptTemplate(SYSTEM_PROMPT).createMessage(Map.of("documents", documentsText));
             ArrayList<Message> messages = new ArrayList<>();
             messages.add(new UserMessage(message));
             messages.add(ragMessage);
 
             // 返回结果
-            return  ollamaChatClient.stream(new Prompt(messages, OllamaOptions.create().withModel(model)))
+            return chatClient.stream(new Prompt(messages, OpenAiChatOptions.builder().withModel(model).build()))
                     .onErrorResume(e -> {  // 处理流中发生的异常
                         log.error("流式处理异常: {}", e.getMessage(), e);
                         return Response.errorFlux(ResponseCode.SYSTEM_B0001);
@@ -119,4 +120,5 @@ public class OllamaController implements IAiService {
             return Response.errorFlux(ResponseCode.SYSTEM_B0001);
         }
     }
+
 }

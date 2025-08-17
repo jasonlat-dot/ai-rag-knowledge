@@ -23,4 +23,14 @@ public interface IAiService {
      * @return 迭代器
      */
     Flux<ChatResponse> generateStream(String model, String message);
+
+    /**
+     * 流式生成 rag 模型对话
+     * @param model 模型
+     * @param ragTag rag 标签
+     * @param message 消息
+     * @return 迭代器
+     */
+    Flux<ChatResponse> generateStreamRag(String model, String ragTag, String message);
+
 }

@@ -14,7 +14,7 @@ public interface IRAGService {
      */
     Response<List<String>> queryRagTagList();
 
-    Response<String> uploadRagFile(String ragTag, List<MultipartFile> files);
+    Response<String> uploadRagFile(String requestId, String ragTag, List<MultipartFile> files);
 
     /**
      * 分析 git 仓库
@@ -23,5 +23,5 @@ public interface IRAGService {
      * @param token git 仓库密码或 token
      * @return 分析结果
      */
-    Response<String> analyzeGitRepository(String repoUrl, String username, String token) throws IOException;
+    Response<String> analyzeGitRepository(String repoUrl, String username, String token, String ragTag, String requestId) throws IOException;
 }

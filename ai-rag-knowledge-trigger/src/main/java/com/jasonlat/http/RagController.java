@@ -1,7 +1,9 @@
 package com.jasonlat.http;
 
 import cc.jq1024.middleware.redisson.IRedissonClientService;
+import cc.jq1024.middleware.redisson.IRedissonService;
 import com.jasonlat.api.IRAGService;
+import com.jasonlat.types.models.AnalyzeStatus;
 import com.jasonlat.types.response.Response;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +19,7 @@ import org.springframework.ai.vectorstore.PgVectorStore;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.PathResource;
 import org.springframework.core.io.Resource;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -25,6 +28,7 @@ import java.io.IOException;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @RestController
@@ -36,6 +40,7 @@ public class RagController implements IRAGService {
     private final TokenTextSplitter tokenTextSplitter;
     private final PgVectorStore pgVectorStore;
     private final IRedissonClientService redissonClientService;
+    private final IRedissonService redissonService;
 
 
     @Value("${knowledge.store.path}")
@@ -50,9 +55,18 @@ public class RagController implements IRAGService {
     }
 
     @Override
-    @RequestMapping(value = "/rag_file/upload", method = {RequestMethod.POST}, headers = "Content-Type=multipart/form-data")
-    public Response<String> uploadRagFile(@RequestParam("ragTag") String ragTag, @RequestParam ("files") List<MultipartFile> files) {
+    @RequestMapping(value = "/files/upload", method = {RequestMethod.POST}, headers = "Content-Type=multipart/form-data")
+    public Response<String> uploadRagFile(@RequestParam("requestId") String requestId, @RequestParam("ragTag") String ragTag, @RequestParam ("files") List<MultipartFile> files) {
+        if (!StringUtils.hasLength(requestId)) {
+            return Response.error("requestId is empty");
+        }
+        if (!StringUtils.hasLength(ragTag)) {
+            return Response.error("ragTag is empty");
+        }
+        String key = requestId + "_" + ragTag;
         try {
+            redissonService.setValue(key, AnalyzeStatus.ANALYZING.getStatus(), 1, TimeUnit.DAYS);
+
             log.info("上传 rag 知识库开始： {}", ragTag);
             for (MultipartFile file : files) {
                 log.info("上传文件： {}", file.getOriginalFilename());
@@ -68,20 +82,38 @@ public class RagController implements IRAGService {
             }
             log.info("上传 rag 知识库完成： {}", ragTag);
 
+            redissonService.setValue(key, AnalyzeStatus.ANALYZED.getStatus(),1, TimeUnit.DAYS);
             return Response.ok("调用成功");
         } catch (Exception e) {
             log.error("上传文件失败", e);
+            redissonService.setValue(key, AnalyzeStatus.ERROR.getStatus(), 1, TimeUnit.DAYS);
             return Response.error();
         }
     }
 
     @Override
     @RequestMapping(value = "/analyze_git_repository", method = {RequestMethod.POST})
-    public Response<String> analyzeGitRepository(@RequestParam("repoUrl") String repoUrl, @RequestParam("username") String username,
-                                                 @RequestParam("token") String token) throws IOException {
+    public Response<String> analyzeGitRepository(@RequestParam("repoUrl") String repoUrl, @RequestParam(value = "username", required = false) String username,
+                                                 @RequestParam(value = "token", required = false) String token, @RequestParam(value = "knowledgeName", required = false) String ragTag,
+                                                 @RequestParam("requestId") String requestId) {
+        String regex = "^(https?://[^/]+/[^/]+/[^/]+)(?:\\.git)?$";
+        if (!repoUrl.matches(regex)) {
+            throw new IllegalArgumentException("Invalid repoUrl");
+        }
+
+        if (!StringUtils.hasLength(requestId)) {
+            return Response.error("requestId is empty");
+        }
+
+        if (!StringUtils.hasLength(ragTag)) {
+            ragTag = getKnowledgeName(repoUrl);
+        }
+        String key = requestId + "_" + ragTag;
         try {
-            String repoProjectName = getKnowledgeName(repoUrl);
-            log.info("开始克隆-{}-仓库...克隆在本地路径：{}", repoProjectName, new File(knowledgeStorePath).getAbsoluteFile());
+
+            redissonService.setValue(key, AnalyzeStatus.ANALYZING.getStatus(), 1, TimeUnit.DAYS);
+            // 设置 redis 标志
+            log.info("开始克隆-{}-仓库...克隆在本地路径：{}", repoUrl, new File(knowledgeStorePath).getAbsoluteFile());
             // 清空临时路径
             FileUtils.deleteDirectory(new File(knowledgeStorePath));
             // 用try-with-resources, 否则需要手动关闭Git对象 -> git.close();
@@ -91,8 +123,8 @@ public class RagController implements IRAGService {
                     .setCredentialsProvider(
                             new UsernamePasswordCredentialsProvider(username, token)).call()) {
 
-                log.info("克隆完成-{}, 开始解析...", repoProjectName);
-                analyzeRepository(repoProjectName);
+                log.info("克隆完成-{}, 开始解析...", repoUrl);
+                analyzeRepository(ragTag);
             } catch (GitAPIException e) {
                 // 处理异常
                 log.error("克隆失败-{}", e.getMessage());
@@ -102,30 +134,48 @@ public class RagController implements IRAGService {
             FileUtils.deleteDirectory(new File(knowledgeStorePath));
 
             // 简单的存到 redis, 实际还要存到数据库
+            // todo ragTag 需要做用户隔离
             RList<String> ragTagList = redissonClientService.getList("ragTag");
-            if (!ragTagList.contains(repoProjectName)) {
-                ragTagList.add(repoProjectName);
+            if (!ragTagList.contains(ragTag)) {
+                ragTagList.add(ragTag);
             }
-            log.info("解析并切分向量完成-{}", repoProjectName);
+            log.info("解析并切分向量完成-{} - {}", ragTag, repoUrl);
+
+            redissonService.setValue(key, AnalyzeStatus.ANALYZED.getStatus(),1, TimeUnit.DAYS);
             return Response.ok("解析完成");
         } catch (Exception e) {
             log.error("解析失败", e);
+            redissonService.setValue(key, AnalyzeStatus.ERROR.getStatus(), 1, TimeUnit.DAYS);
             return Response.error();
         }
+    }
+
+    @RequestMapping(value = "/analyze_git_repository/status", method = {RequestMethod.GET})
+    public Response<String> queryAnalyzeStatus(@RequestParam("ragTag") String ragTag, @RequestParam("requestId") String requestId) {
+
+        RList<String> ragTagList = redissonClientService.getList("ragTag");
+        if (!ragTagList.contains(ragTag)) {
+            return Response.ok(AnalyzeStatus.ERROR.getStatus());
+        }
+        String analyzeStatus = redissonService.getValue(requestId + "_" + ragTag);
+        if (AnalyzeStatus.ERROR.getStatus().equalsIgnoreCase(analyzeStatus)) {
+            return Response.ok(AnalyzeStatus.ERROR.getStatus());
+        }
+        if (AnalyzeStatus.ANALYZING.getStatus().equalsIgnoreCase(analyzeStatus)) {
+            return Response.ok(AnalyzeStatus.ANALYZING.getStatus());
+        }
+        return Response.ok(AnalyzeStatus.ANALYZED.getStatus());
     }
 
     /**
      * 通过 repoUrl 获取知识库名称
      */
     private String getKnowledgeName(String repoUrl) {
-        // 正则校验 repoUrl， 兼容所有的git仓库
-        String regex = "^(https?://[^/]+/[^/]+/[^/]+)(?:\\.git)?$";
-        if (!repoUrl.matches(regex)) {
-            throw new IllegalArgumentException("Invalid repoUrl");
-        }
         String[] parts = repoUrl.split("/");
         String projectNameWithGit = parts[parts.length - 1];
-        return projectNameWithGit.replace(".git", "");
+        String projectName = projectNameWithGit.replace(".git", "");
+        log.info("知识库(代码仓库)名称：{}", projectName);
+        return projectName;
     }
 
     private void analyzeRepository(String repoProjectName) throws IOException {

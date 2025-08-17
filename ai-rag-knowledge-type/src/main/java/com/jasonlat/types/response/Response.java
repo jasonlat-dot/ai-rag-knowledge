@@ -4,8 +4,13 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.ai.chat.ChatResponse;
+import org.springframework.ai.chat.Generation;
+import org.springframework.ai.chat.metadata.ChatGenerationMetadata;
+import reactor.core.publisher.Flux;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 
 import static com.jasonlat.types.response.ResponseCode.UN_ERROR;
 
@@ -86,5 +91,46 @@ public class Response<T> implements Serializable {
 
     public static <T> Response<T> error(String info) {
         return build(UN_ERROR.getCode(), info, null);
+    }
+
+    public static Flux<ChatResponse> errorFlux(ResponseCode resultCode) {
+        return errorFlux(resultCode.getInfo());
+    }
+
+    public static Flux<ChatResponse> errorFlux(String message) {
+        ChatResponse errorResponse = new ChatResponse(new ArrayList<>() {{
+            add(0, new Generation(message).withGenerationMetadata(new ChatGenerationMetadata() {
+                @Override
+                public <T> T getContentFilterMetadata() {
+                    return null;
+                }
+
+                @Override
+                public String getFinishReason() {
+                    return "STOP";
+                }
+            }));
+        }});
+        return Flux.just(errorResponse);
+    }
+
+    public static ChatResponse errorCall(ResponseCode resultCode) {
+        return errorCall(resultCode.getInfo());
+    }
+
+    public static ChatResponse errorCall(String message) {
+        return new ChatResponse(new ArrayList<>() {{
+            add(0, new Generation(message).withGenerationMetadata(new ChatGenerationMetadata() {
+                @Override
+                public <T> T getContentFilterMetadata() {
+                    return null;
+                }
+
+                @Override
+                public String getFinishReason() {
+                    return "STOP";
+                }
+            }));
+        }});
     }
 }
