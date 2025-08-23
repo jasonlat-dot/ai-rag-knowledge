@@ -15,7 +15,18 @@ app:
     # 版本，方便通过接口版本升级
     api-version: v1
     # 跨域，开发阶段可以设置为 * 不限制
-    cross-origin: '*'
+    cross-origin:  '*'
+
+#  -Djasypt.encryptor.password=lijiaqiang1024@wt1314520
+#java -Djasypt.encryptor.password=lijiaqiang1024@wt1314520 -jar course-push-app.jar
+jasypt:
+  encryptor:
+    algorithm: PBEWithMD5AndDES
+    password: ${JASYPT_ENCRYPTOR_PASSWORD}
+    iv-generator-classname: org.jasypt.iv.NoIvGenerator
+    property:
+      prefix: ENC(
+      suffix: )
 
 # 线程池配置
 thread:
@@ -27,10 +38,22 @@ thread:
         keep-alive-time: 5000
         block-queue-size: 5000
         policy: CallerRunsPolicy
+
+knowledge:
+  store:
+    path: /data/knowledge
+#    path: './git-cloned-repo/knowledge'
+
 spring:
+  # ollama ai
   ai:
+    openai:
+      enabled: false
+      base-url: url
+      api-key: apiKey
+      embedding-mode: text-embedding-ada-002 # 效果好一些
     ollama:
-      base-url: http://192.168.3.16:11434
+      base-url: http://127.0.0.1:11434
       # 向量模型
       embedding:
         options:
@@ -38,18 +61,14 @@ spring:
           num-batch: 512
         # nomic-embed-text 这是 Nomic 公司开发的一款轻量级嵌入模型，适合生成文本的向量表示，常用于检索增强生成（RAG）等场景。
         model: nomic-embed-text
-
-knowledge:
-  store:
-#    path: /data/knowledge
-    path: './git-cloned-repo/knowledge'
-
+    rag:
+      embed: nomic-embed-text # 默认使用的向量模型
   # 向量数据库
   datasource:
     driver-class-name: org.postgresql.Driver
-    username: postgres
-    password: postgres
-    url: jdbc:postgresql://192.168.3.16:15432/ai-rag-knowledge
+    username: ENC(kT6cWGip6fSnLJz5WVhGyaFeuFLsCQ6P)
+    password: ENC(ny4D4WfjIPT9HhmlnXF5/7mY6JLchT+L)
+    url: jdbc:postgresql://127.0.0.1:15432/ai-rag-knowledge
     type: com.zaxxer.hikari.HikariDataSource
     # hikari连接池配置
     hikari:
@@ -70,14 +89,15 @@ knowledge:
       # 连接测试query
       connection-test-query: SELECT 1
 
+
 jq1024:
   cc:
     # redisson 配置
     redisson:
-      host: your-host
-      port: 6379
-      password: password
-      database: 4
+      host: 127.0.0.1
+      port: ENC(IoLWVdM0/gTgs+XZ+Gq8nA==)
+      password: ENC(Xo8agmA26A3MM5iD1uGiwM1BOzNIN9zI)
+      database: 0
       pool-size: 10
       min-idle-size: 5
       idle-timeout: 30000
